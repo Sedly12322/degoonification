@@ -7,6 +7,8 @@ CXXFLAGS ?= -std=c++20 -O3 -Wall -Wextra -Wno-pedantic -fPIC \
 	-Iinference \
 	-Ioverlay \
 	-Ioverlay/protocols \
+	-Inetwork \
+	-Iwatchdog \
 	-I/usr/include/onnxruntime \
 	$(shell pkg-config --cflags libpipewire-0.3 wayland-client)
 
@@ -27,6 +29,10 @@ OBJS = \
 	$(BUILD_DIR)/xdg-shell-protocol.o \
 	$(BUILD_DIR)/wlr-layer-shell-unstable-v1-protocol.o \
 	$(BUILD_DIR)/wayland_overlay.o \
+	$(BUILD_DIR)/dns_packet.o \
+	$(BUILD_DIR)/dns_server.o \
+	$(BUILD_DIR)/anti_tamper.o \
+	$(BUILD_DIR)/watchdog_supervisor.o \
 	$(BUILD_DIR)/main.o
 
 TARGET = $(BIN_DIR)/degoonification-daemon
@@ -60,6 +66,18 @@ $(BUILD_DIR)/wlr-layer-shell-unstable-v1-protocol.o: overlay/protocols/wlr-layer
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/wayland_overlay.o: overlay/wayland_overlay.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/dns_packet.o: network/dns_packet.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/dns_server.o: network/dns_server.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/anti_tamper.o: watchdog/anti_tamper.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/watchdog_supervisor.o: watchdog/watchdog_supervisor.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/main.o: main.cpp | $(BUILD_DIR)

@@ -1,0 +1,25 @@
+[Unit]
+Description=Degoonification Real-Time Protection Daemon
+Documentation=https://github.com/Sedly12322/degoonification
+After=network.target graphical.target pipewire.service
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/degoonification-daemon
+Restart=always
+RestartSec=1s
+
+# Hardened Security & Anti-Tamper
+ProtectSystem=strict
+ProtectHome=read-only
+NoNewPrivileges=true
+KillMode=control-group
+LimitCORE=0
+OOMScoreAdjust=-500
+
+# Capability bounding
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+
+[Install]
+WantedBy=multi-user.target
