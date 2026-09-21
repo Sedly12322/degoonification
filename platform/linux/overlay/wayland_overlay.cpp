@@ -35,6 +35,7 @@ struct WaylandOverlay::Impl {
     ShmBuffer buffers[2];
     int current_buffer{0};
     bool had_boxes{false};
+    std::vector<core::BoundingBox> last_rendered_boxes;
 };
 
 static void buffer_release(void* data, wl_buffer* wl_buffer) {
@@ -191,6 +192,8 @@ bool WaylandOverlay::init() {
                        ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
                        ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT;
     zwlr_layer_surface_v1_set_anchor(impl_->layer_surface, anchors);
+    zwlr_layer_surface_v1_set_exclusive_zone(impl_->layer_surface, -1);
+    zwlr_layer_surface_v1_set_size(impl_->layer_surface, 0, 0);
     zwlr_layer_surface_v1_set_keyboard_interactivity(impl_->layer_surface, ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE);
 
     // Enforce click-through via empty input region
@@ -211,11 +214,28 @@ bool WaylandOverlay::init() {
     return true;
 }
 
+static bool boxes_differ(const std::vector<core::BoundingBox>& a, const std::vector<core::BoundingBox>& b) {
+    if (a.size() != b.size()) return true;
+    for (size_t i = 0; i < a.size(); ++i) {
+        if (std::abs(a[i].x - b[i].x) > 0.003f ||
+            std::abs(a[i].y - b[i].y) > 0.003f ||
+            std::abs(a[i].width - b[i].width) > 0.003f ||
+            std::abs(a[i].height - b[i].height) > 0.003f) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void WaylandOverlay::render_boxes(const std::vector<core::BoundingBox>& boxes) {
     if (!impl_ || !impl_->surface || !impl_->configured) return;
 
-    if (boxes.empty() && !impl_->had_boxes) {
-        return; // Already cleared, skip redundant composite work
+    if (boxes.empty() && impl_->last_rendered_boxes.empty()) {
+        return; // Already cleared, avoid redundant composite cycles
+    }
+
+    if (!boxes_differ(boxes, impl_->last_rendered_boxes)) {
+        return; // Boxes unchanged, retain current screen buffer to completely eliminate flicker!
     }
 
     impl_->current_buffer = 1 - impl_->current_buffer;
@@ -242,10 +262,9 @@ void WaylandOverlay::render_boxes(const std::vector<core::BoundingBox>& boxes) {
                 }
             }
         }
-        impl_->had_boxes = true;
-    } else {
-        impl_->had_boxes = false;
     }
+
+    impl_->last_rendered_boxes = boxes;
 
     wl_surface_attach(impl_->surface, buf.wl_buf, 0, 0);
     wl_surface_damage_buffer(impl_->surface, 0, 0, impl_->width, impl_->height);

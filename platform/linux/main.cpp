@@ -118,12 +118,12 @@ int main(int argc, char** argv) {
     }
 
     // 5. Initialize Core Shared Anti-Flicker Tracker
-    float padding_ratio = 0.15f;
-    std::cout << "[Init] Initializing Temporal Smoothing Hysteresis Tracker (300ms window, +15% padding)...\n";
+    float padding_ratio = 0.35f;
+    std::cout << "[Init] Initializing Temporal Smoothing Hysteresis Tracker (800ms window, +35% padding)...\n";
     core::TemporalSmoothingTracker tracker(core::TrackerConfig{
-        .persistence_window_ms = 300,
+        .persistence_window_ms = 800,
         .padding_ratio = padding_ratio,
-        .merge_iou_threshold = 0.25f
+        .merge_iou_threshold = 0.15f
     });
 
     // 6. Initialize Preprocessor
@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
     std::cout << "[Init] Initializing ONNX Runtime AI Detector with model: " << model_path << "...\n";
     linux_backend::OnnxDetector detector(linux_backend::DetectorConfig{
         .model_path = model_path,
-        .confidence_threshold = 0.35f,
+        .confidence_threshold = 0.20f,
         .nms_iou_threshold = 0.45f,
         .input_width = 640,
         .input_height = 640,
@@ -153,6 +153,7 @@ int main(int argc, char** argv) {
     // 8. Start Screen Capture & AI Detection Thread
     std::mutex boxes_mutex;
     std::vector<core::BoundingBox> latest_raw_boxes;
+    std::atomic<uint64_t> raw_frame_seq{0};
     std::atomic<uint64_t> total_frames_analyzed{0};
     std::atomic<uint32_t> current_fps{12};
     std::atomic<bool> worker_running{true};
@@ -181,6 +182,7 @@ int main(int argc, char** argv) {
                         std::lock_guard<std::mutex> lock(boxes_mutex);
                         latest_raw_boxes = std::move(detected_boxes);
                     }
+                    raw_frame_seq.fetch_add(1, std::memory_order_release);
 
                     frame_count++;
                     total_count++;
@@ -189,6 +191,7 @@ int main(int argc, char** argv) {
             } else {
                 std::lock_guard<std::mutex> lock(boxes_mutex);
                 latest_raw_boxes.clear();
+                raw_frame_seq.fetch_add(1, std::memory_order_release);
             }
 
             auto now_tp = std::chrono::steady_clock::now();
@@ -211,6 +214,8 @@ int main(int argc, char** argv) {
 
     uint32_t active_box_count = 0;
     std::string last_event = "Defense active and monitoring screen";
+    uint64_t last_processed_seq = 0;
+    uint64_t last_tracker_tick = get_current_time_ms();
 
     // Main event loop
     while (g_running.load()) {
@@ -259,9 +264,9 @@ int main(int argc, char** argv) {
                 try {
                     padding_ratio = std::stof(args);
                     tracker.set_config(core::TrackerConfig{
-                        .persistence_window_ms = 300,
+                        .persistence_window_ms = 800,
                         .padding_ratio = padding_ratio,
-                        .merge_iou_threshold = 0.25f
+                        .merge_iou_threshold = 0.15f
                     });
                     last_event = "Padding ratio adjusted to +" + std::to_string(static_cast<int>(padding_ratio * 100)) + "%";
                 } catch (...) {}
@@ -282,22 +287,29 @@ int main(int argc, char** argv) {
         overlay.dispatch_events();
 
         // 3. Update temporal smoothing tracker and render boxes onto screen
-        std::vector<core::BoundingBox> current_detections;
-        {
-            std::lock_guard<std::mutex> lock(boxes_mutex);
-            current_detections = latest_raw_boxes;
-        }
+        uint64_t current_seq = raw_frame_seq.load(std::memory_order_acquire);
+        bool is_new_frame = (current_seq != last_processed_seq);
 
-        if (!visual_blur_paused) {
-            auto active_boxes = tracker.process_frame(current_detections, now_ms);
-            active_box_count = active_boxes.size();
-            overlay.render_boxes(active_boxes);
-            if (active_box_count > 0) {
-                last_event = "BLUR SHIELD ACTIVE: " + std::to_string(active_box_count) + " explicit region(s) blocked";
+        if (is_new_frame || (now_ms - last_tracker_tick >= 100)) {
+            std::vector<core::BoundingBox> current_detections;
+            if (is_new_frame) {
+                std::lock_guard<std::mutex> lock(boxes_mutex);
+                current_detections = latest_raw_boxes;
+                last_processed_seq = current_seq;
             }
-        } else {
-            overlay.render_boxes({});
-            active_box_count = 0;
+
+            if (!visual_blur_paused) {
+                auto active_boxes = tracker.process_frame(current_detections, now_ms);
+                active_box_count = active_boxes.size();
+                overlay.render_boxes(active_boxes);
+                if (active_box_count > 0) {
+                    last_event = "BLUR SHIELD ACTIVE: " + std::to_string(active_box_count) + " explicit region(s) blocked";
+                }
+            } else {
+                overlay.render_boxes({});
+                active_box_count = 0;
+            }
+            last_tracker_tick = now_ms;
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 FPS dispatch

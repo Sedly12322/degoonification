@@ -9,11 +9,11 @@ namespace degoonification::core {
 
 struct TrackerConfig {
     /// Maximum time in milliseconds a box remains active after detection (hysteresis window)
-    uint64_t persistence_window_ms{300};
-    /// Dynamic outward boundary expansion ratio (e.g., 0.15 = +15%)
-    float padding_ratio{0.15f};
+    uint64_t persistence_window_ms{800};
+    /// Dynamic outward boundary expansion ratio (e.g., 0.35 = +35%)
+    float padding_ratio{0.35f};
     /// Minimum IoU threshold to associate and merge matching/overlapping boxes
-    float merge_iou_threshold{0.25f};
+    float merge_iou_threshold{0.15f};
 };
 
 /**
