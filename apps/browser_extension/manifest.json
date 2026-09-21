@@ -17,17 +17,23 @@
   ],
   "incognito": "spanning",
   "background": {
-    "scripts": ["background.js"],
+    "scripts": ["domains.js", "background.js"],
     "persistent": true
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": ["domains.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_start",
       "all_frames": true
     }
+  ],
+  "web_accessible_resources": [
+    "blocked.html",
+    "blocked.css",
+    "blocked.js",
+    "icons/*"
   ],
   "browser_action": {
     "default_popup": "popup.html",

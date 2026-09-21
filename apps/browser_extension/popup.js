@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const masterToggle = document.getElementById('masterToggle');
+  const blockSitesToggle = document.getElementById('blockSitesToggle');
   const videoToggle = document.getElementById('videoToggle');
   const imageToggle = document.getElementById('imageToggle');
   const strictToggle = document.getElementById('strictToggle');
@@ -7,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const blurSlider = document.getElementById('blurSlider');
   const blurValue = document.getElementById('blurValue');
   const statusBadge = document.getElementById('statusBadge');
+  const blockedSitesCount = document.getElementById('blockedSitesCount');
   const blockedCount = document.getElementById('blockedCount');
 
   const storage = (typeof browser !== 'undefined') ? browser.storage.local : chrome.storage.local;
@@ -25,21 +27,27 @@ document.addEventListener('DOMContentLoaded', () => {
   if (storage) {
     storage.get({
       enabled: true,
+      blockAdultSites: true,
       blurVideos: true,
       blurImages: true,
       strictMode: false,
       allowPeek: false,
       blurRadius: 28,
-      stats: { totalBlocked: 0 }
+      stats: { totalBlockedMedia: 0, totalBlockedSites: 0 }
     }, (items) => {
       masterToggle.checked = items.enabled;
+      blockSitesToggle.checked = items.blockAdultSites !== false;
       videoToggle.checked = items.blurVideos;
       imageToggle.checked = items.blurImages;
       strictToggle.checked = items.strictMode;
       peekToggle.checked = items.allowPeek;
       blurSlider.value = items.blurRadius;
       blurValue.textContent = `${items.blurRadius}px`;
-      blockedCount.textContent = items.stats?.totalBlocked || 0;
+
+      const stats = items.stats || {};
+      blockedSitesCount.textContent = stats.totalBlockedSites || 0;
+      blockedCount.textContent = stats.totalBlockedMedia || 0;
+
       updateStatus(items.enabled);
     });
   }
@@ -49,6 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const val = masterToggle.checked;
     updateStatus(val);
     storage.set({ enabled: val });
+  });
+
+  blockSitesToggle.addEventListener('change', () => {
+    storage.set({ blockAdultSites: blockSitesToggle.checked });
   });
 
   videoToggle.addEventListener('change', () => {

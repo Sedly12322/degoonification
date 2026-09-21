@@ -44,28 +44,35 @@
     <!-- Protection Controls -->
     <section class="card settings-card">
       <div class="setting-row">
-        <span>Blur All Videos</span>
+        <span>Blokovat erotické weby</span>
+        <label class="switch-sm">
+          <input type="checkbox" id="blockSitesToggle" checked>
+          <span class="slider-sm"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <span>Rozmazat všechna videa</span>
         <label class="switch-sm">
           <input type="checkbox" id="videoToggle" checked>
           <span class="slider-sm"></span>
         </label>
       </div>
       <div class="setting-row">
-        <span>Blur Trigger Images</span>
+        <span>Rozmazat explicitní fotky</span>
         <label class="switch-sm">
           <input type="checkbox" id="imageToggle" checked>
           <span class="slider-sm"></span>
         </label>
       </div>
       <div class="setting-row">
-        <span>Strict Mode (All Images)</span>
+        <span>Striktní režim (všechna média)</span>
         <label class="switch-sm">
           <input type="checkbox" id="strictToggle">
           <span class="slider-sm"></span>
         </label>
       </div>
       <div class="setting-row">
-        <span>Allow Hover Peek</span>
+        <span>Povolit náhled najetím myši</span>
         <label class="switch-sm">
           <input type="checkbox" id="peekToggle">
           <span class="slider-sm"></span>
@@ -76,12 +83,12 @@
     <!-- Stats Bar -->
     <section class="stats-row">
       <div class="stat-box">
-        <span class="stat-number" id="blockedCount">0</span>
-        <span class="stat-label">Media Shielded</span>
+        <span class="stat-number" id="blockedSitesCount">0</span>
+        <span class="stat-label">Zablokováno webů</span>
       </div>
       <div class="stat-box">
-        <span class="stat-number">Active</span>
-        <span class="stat-label">SafeSearch</span>
+        <span class="stat-number" id="blockedCount">0</span>
+        <span class="stat-label">Rozmazáno médií</span>
       </div>
     </section>
 

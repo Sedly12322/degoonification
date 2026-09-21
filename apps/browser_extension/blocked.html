@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🛡️ Přístup zablokován // Degoonification Defense</title>
+  <link rel="stylesheet" href="blocked.css">
+</head>
+<body>
+  <div class="overlay-glow"></div>
+
+  <main class="container">
+    <!-- Shield Icon with Pulse -->
+    <div class="shield-container">
+      <div class="shield-halo"></div>
+      <div class="shield-badge">🛡️</div>
+    </div>
+
+    <!-- Main Header -->
+    <header class="header">
+      <h1 class="title">PŘÍSTUP ZABLOKOVÁN</h1>
+      <p class="subtitle">DEGOONIFICATION SHIELD // SYSTÉMOVÁ OCHRANA AKTIVNÍ</p>
+    </header>
+
+    <!-- Info Card -->
+    <section class="card info-card">
+      <div class="card-row">
+        <span class="label">Blokovaná stránka:</span>
+        <span class="blocked-target" id="targetUrl">Načítání...</span>
+      </div>
+      <div class="card-row">
+        <span class="label">Důvod zásahu:</span>
+        <span class="tag-danger">Explicitní / Erotický obsah</span>
+      </div>
+      <div class="card-row">
+        <span class="label">Stav ochrany:</span>
+        <span class="tag-success">✓ Váš čistý streak je ochráněn</span>
+      </div>
+    </section>
+
+    <!-- Stoic Motivation Card -->
+    <section class="card quote-card">
+      <div class="quote-mark">“</div>
+      <p class="quote-text" id="quoteText">Máš moc nad svou myslí, ne nad vnějšími událostmi. Uvědom si to a najdeš svou pravou sílu.</p>
+      <span class="quote-author" id="quoteAuthor">— Marcus Aurelius</span>
+    </section>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn btn-primary" id="btnBack">
+        <span>🛡️</span> <span>Návrat do bezpečí</span>
+      </button>
+      <button class="btn btn-secondary" id="btnBreathe">
+        <span>🧘</span> <span>30s Zastavení a dech</span>
+      </button>
+    </div>
+
+    <!-- Breathing overlay modal (hidden by default) -->
+    <div class="breathing-modal" id="breathingModal">
+      <div class="breathing-circle" id="breatheCircle">
+        <span class="breathe-text" id="breatheText">Nádech...</span>
+      </div>
+      <button class="btn btn-sm" id="btnCloseBreathe">Zavřít</button>
+    </div>
+
+    <footer class="footer">
+      <span>Degoonification Linux Defense System // Hardened & Anti-Relapse</span>
+    </footer>
+  </main>
+
+  <script src="blocked.js"></script>
+</body>
+</html>

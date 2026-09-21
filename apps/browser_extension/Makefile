@@ -1,13 +1,15 @@
 XPI_NAME = degoonification-zen.xpi
 ZEN_PROFILE = $(HOME)/.config/zen/jlgm1jgg.Default (release)
 
-.PHONY: all clean xpi install-profile
+.PHONY: all clean xpi install-profile install
 
 all: xpi
 
+install: install-profile
+
 xpi:
 	@rm -f $(XPI_NAME)
-	zip -r -FS $(XPI_NAME) manifest.json background.js content.js content.css popup.html popup.css popup.js icons/
+	zip -r -FS $(XPI_NAME) manifest.json background.js domains.js content.js content.css popup.html popup.css popup.js blocked.html blocked.css blocked.js icons/
 	@echo "✓ Packaged WebExtension: $(XPI_NAME)"
 
 clean:
