@@ -6,6 +6,7 @@
 #include "network/dns_server.hpp"
 #include "watchdog/anti_tamper.hpp"
 #include "ipc/ipc_server.hpp"
+#include "inference/visual_anchor_tracker.hpp"
 #include "engine_shared/temporal_smoothing.hpp"
 #include <iostream>
 #include <chrono>
@@ -117,25 +118,22 @@ int main(int argc, char** argv) {
         std::cout << "[Init] Overlay initialized successfully (" << overlay.screen_width() << "x" << overlay.screen_height() << ")\n";
     }
 
-    // 5. Initialize Core Shared Anti-Flicker Tracker
+    // 5. Initialize Visual Anchor Anti-Flicker Tracker
     float padding_ratio = 0.35f;
-    std::cout << "[Init] Initializing Temporal Smoothing Hysteresis Tracker (800ms window, +35% padding)...\n";
-    core::TemporalSmoothingTracker tracker(core::TrackerConfig{
-        .persistence_window_ms = 800,
+    std::cout << "[Init] Initializing Visual Anchor Anti-Flicker Tracker (1200ms window, +35% padding, subpixel lock)...\n";
+    linux_backend::VisualAnchorTracker tracker(linux_backend::AnchorTrackerConfig{
+        .persistence_window_ms = 1200,
         .padding_ratio = padding_ratio,
-        .merge_iou_threshold = 0.15f
+        .merge_iou_threshold = 0.15f,
+        .anchor_error_threshold = 22.0f
     });
 
-    // 6. Initialize Preprocessor
-    linux_backend::ImagePreprocessor preprocessor(640, 640);
-    std::vector<float> planar_rgb;
-
-    // 7. Initialize AI Inference Engine (Phase 2)
+    // 6. Initialize AI Inference Engine (Phase 2)
     std::string model_path = resolve_model_path((argc > 1) ? argv[1] : "");
     std::cout << "[Init] Initializing ONNX Runtime AI Detector with model: " << model_path << "...\n";
     linux_backend::OnnxDetector detector(linux_backend::DetectorConfig{
         .model_path = model_path,
-        .confidence_threshold = 0.20f,
+        .confidence_threshold = 0.18f,
         .nms_iou_threshold = 0.45f,
         .input_width = 640,
         .input_height = 640,
@@ -150,12 +148,12 @@ int main(int argc, char** argv) {
         std::cout << "[Init] AI Detector loaded successfully with hardware acceleration.\n";
     }
 
-    // 8. Start Screen Capture & AI Detection Thread
+    // 7. Start Screen Capture & AI Detection Thread
     std::mutex boxes_mutex;
-    std::vector<core::BoundingBox> latest_raw_boxes;
+    std::vector<core::BoundingBox> latest_rendered_boxes;
     std::atomic<uint64_t> raw_frame_seq{0};
     std::atomic<uint64_t> total_frames_analyzed{0};
-    std::atomic<uint32_t> current_fps{12};
+    std::atomic<uint32_t> current_fps{15};
     std::atomic<bool> worker_running{true};
     bool visual_blur_paused = false;
 
@@ -175,12 +173,15 @@ int main(int argc, char** argv) {
 
             if (!visual_blur_paused && model_loaded) {
                 if (screencap.capture_frame(frame)) {
-                    preprocessor.preprocess(frame, planar_rgb);
-                    auto detected_boxes = detector.detect(planar_rgb.data());
+                    auto letterbox = preprocessor.preprocess(frame, planar_rgb);
+                    auto detected_boxes = detector.detect(planar_rgb.data(), letterbox);
+                    uint64_t now_ms = get_current_time_ms();
+
+                    auto active_boxes = tracker.process_frame(frame, detected_boxes, now_ms);
 
                     {
                         std::lock_guard<std::mutex> lock(boxes_mutex);
-                        latest_raw_boxes = std::move(detected_boxes);
+                        latest_rendered_boxes = std::move(active_boxes);
                     }
                     raw_frame_seq.fetch_add(1, std::memory_order_release);
 
@@ -190,7 +191,7 @@ int main(int argc, char** argv) {
                 }
             } else {
                 std::lock_guard<std::mutex> lock(boxes_mutex);
-                latest_raw_boxes.clear();
+                latest_rendered_boxes.clear();
                 raw_frame_seq.fetch_add(1, std::memory_order_release);
             }
 
@@ -203,7 +204,7 @@ int main(int argc, char** argv) {
             }
 
             auto process_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - loop_start).count();
-            int sleep_ms = 85 - static_cast<int>(process_time); // ~12 FPS
+            int sleep_ms = 66 - static_cast<int>(process_time); // ~15 FPS
             if (sleep_ms > 10) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
             }
@@ -215,11 +216,9 @@ int main(int argc, char** argv) {
     uint32_t active_box_count = 0;
     std::string last_event = "Defense active and monitoring screen";
     uint64_t last_processed_seq = 0;
-    uint64_t last_tracker_tick = get_current_time_ms();
 
     // Main event loop
     while (g_running.load()) {
-        uint64_t now_ms = get_current_time_ms();
 
         // 1. Process IPC commands from CLI / TUI
         ipc_server.process_pending([&](const std::string& cmd, const std::string& args) -> std::string {
@@ -253,6 +252,7 @@ int main(int argc, char** argv) {
                 return ss.str();
             } else if (cmd == "PAUSE") {
                 visual_blur_paused = true;
+                tracker.reset();
                 overlay.render_boxes({});
                 last_event = "Visual blur temporarily paused via CLI";
                 return "OK\n";
@@ -263,10 +263,11 @@ int main(int argc, char** argv) {
             } else if (cmd == "SET_PADDING") {
                 try {
                     padding_ratio = std::stof(args);
-                    tracker.set_config(core::TrackerConfig{
-                        .persistence_window_ms = 800,
+                    tracker.set_config(linux_backend::AnchorTrackerConfig{
+                        .persistence_window_ms = 1200,
                         .padding_ratio = padding_ratio,
-                        .merge_iou_threshold = 0.15f
+                        .merge_iou_threshold = 0.15f,
+                        .anchor_error_threshold = 22.0f
                     });
                     last_event = "Padding ratio adjusted to +" + std::to_string(static_cast<int>(padding_ratio * 100)) + "%";
                 } catch (...) {}
@@ -286,22 +287,21 @@ int main(int argc, char** argv) {
         // 2. Process Wayland events non-blockingly
         overlay.dispatch_events();
 
-        // 3. Update temporal smoothing tracker and render boxes onto screen
+        // 3. Render active boxes onto screen whenever new frame is processed
         uint64_t current_seq = raw_frame_seq.load(std::memory_order_acquire);
         bool is_new_frame = (current_seq != last_processed_seq);
 
-        if (is_new_frame || (now_ms - last_tracker_tick >= 100)) {
-            std::vector<core::BoundingBox> current_detections;
-            if (is_new_frame) {
+        if (is_new_frame) {
+            std::vector<core::BoundingBox> current_boxes;
+            {
                 std::lock_guard<std::mutex> lock(boxes_mutex);
-                current_detections = latest_raw_boxes;
+                current_boxes = latest_rendered_boxes;
                 last_processed_seq = current_seq;
             }
 
             if (!visual_blur_paused) {
-                auto active_boxes = tracker.process_frame(current_detections, now_ms);
-                active_box_count = active_boxes.size();
-                overlay.render_boxes(active_boxes);
+                active_box_count = current_boxes.size();
+                overlay.render_boxes(current_boxes);
                 if (active_box_count > 0) {
                     last_event = "BLUR SHIELD ACTIVE: " + std::to_string(active_box_count) + " explicit region(s) blocked";
                 }
@@ -309,7 +309,6 @@ int main(int argc, char** argv) {
                 overlay.render_boxes({});
                 active_box_count = 0;
             }
-            last_tracker_tick = now_ms;
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 FPS dispatch

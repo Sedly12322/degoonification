@@ -81,6 +81,7 @@ bool OnnxDetector::is_explicit_class(int32_t class_id) noexcept {
     // 3: FEMALE_BREAST_EXPOSED
     // 4: FEMALE_GENITALIA_EXPOSED
     // 6: ANUS_EXPOSED
+    // 13: BELLY_EXPOSED
     // 14: MALE_GENITALIA_EXPOSED
     // 15: ANUS_COVERED
     // 16: FEMALE_BREAST_COVERED
@@ -91,6 +92,7 @@ bool OnnxDetector::is_explicit_class(int32_t class_id) noexcept {
         case 3:
         case 4:
         case 6:
+        case 13:
         case 14:
         case 15:
         case 16:
@@ -101,7 +103,10 @@ bool OnnxDetector::is_explicit_class(int32_t class_id) noexcept {
     }
 }
 
-std::vector<core::BoundingBox> OnnxDetector::detect(const float* planar_rgb_data) {
+std::vector<core::BoundingBox> OnnxDetector::detect(
+    const float* planar_rgb_data,
+    const LetterboxInfo& letterbox
+) {
     if (!is_initialized_ || !impl_ || !impl_->session || !planar_rgb_data) {
         return {};
     }
@@ -142,6 +147,9 @@ std::vector<core::BoundingBox> OnnxDetector::detect(const float* planar_rgb_data
 
         std::vector<core::BoundingBox> candidates;
 
+        float scaled_w = letterbox.scaled_w > 0 ? static_cast<float>(letterbox.scaled_w) : static_cast<float>(config_.input_width);
+        float scaled_h = letterbox.scaled_h > 0 ? static_cast<float>(letterbox.scaled_h) : static_cast<float>(config_.input_height);
+
         for (int64_t col = 0; col < cols; ++col) {
             float max_score = 0.0f;
             int32_t best_class = -1;
@@ -155,23 +163,33 @@ std::vector<core::BoundingBox> OnnxDetector::detect(const float* planar_rgb_data
             }
 
             if (max_score >= config_.confidence_threshold && is_explicit_class(best_class)) {
-                float cx = out_data[0 * cols + col] / static_cast<float>(config_.input_width);
-                float cy = out_data[1 * cols + col] / static_cast<float>(config_.input_height);
-                float w  = out_data[2 * cols + col] / static_cast<float>(config_.input_width);
-                float h  = out_data[3 * cols + col] / static_cast<float>(config_.input_height);
+                float cx = out_data[0 * cols + col];
+                float cy = out_data[1 * cols + col];
+                float w  = out_data[2 * cols + col];
+                float h  = out_data[3 * cols + col];
 
-                float x = std::max(0.0f, cx - (w * 0.5f));
-                float y = std::max(0.0f, cy - (h * 0.5f));
+                // Un-map letterbox coords back to original frame [0, 1]
+                float norm_cx = (cx - letterbox.pad_x) / scaled_w;
+                float norm_cy = (cy - letterbox.pad_y) / scaled_h;
+                float norm_w  = w / scaled_w;
+                float norm_h  = h / scaled_h;
 
-                candidates.push_back(core::BoundingBox{
-                    .x = x,
-                    .y = y,
-                    .width = std::min(1.0f - x, w),
-                    .height = std::min(1.0f - y, h),
-                    .confidence = max_score,
-                    .class_id = best_class,
-                    .timestamp_ms = 0
-                });
+                float x = std::clamp(norm_cx - (norm_w * 0.5f), 0.0f, 1.0f);
+                float y = std::clamp(norm_cy - (norm_h * 0.5f), 0.0f, 1.0f);
+                float box_w = std::clamp(norm_w, 0.0f, 1.0f - x);
+                float box_h = std::clamp(norm_h, 0.0f, 1.0f - y);
+
+                if (box_w > 0.005f && box_h > 0.005f) {
+                    candidates.push_back(core::BoundingBox{
+                        .x = x,
+                        .y = y,
+                        .width = box_w,
+                        .height = box_h,
+                        .confidence = max_score,
+                        .class_id = best_class,
+                        .timestamp_ms = 0
+                    });
+                }
             }
         }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine_shared/bounding_box.hpp"
+#include "image_preprocessor.hpp"
 #include <vector>
 #include <string>
 #include <memory>
@@ -39,9 +40,13 @@ public:
 
     /**
      * Runs inference on planar RGB float32 buffer [3 x 640 x 640] normalized to [0.0, 1.0].
+     * Un-maps letterboxed coordinates back to original frame [0.0, 1.0].
      * Returns detected explicit bounding boxes in normalized coordinates [0.0, 1.0].
      */
-    std::vector<core::BoundingBox> detect(const float* planar_rgb_data);
+    std::vector<core::BoundingBox> detect(
+        const float* planar_rgb_data,
+        const LetterboxInfo& letterbox = LetterboxInfo{}
+    );
 
     /**
      * Checks if class_id represents explicit/NSFW content requiring blur.
