@@ -1,0 +1,124 @@
+# Degoonification Android DNS Sinkhole Blocklist
+0.0.0.0 beeg.com
+0.0.0.0 bongacams.com
+0.0.0.0 cam4.com
+0.0.0.0 chaturbate.com
+0.0.0.0 coomer.party
+0.0.0.0 coomer.su
+0.0.0.0 danbooru.donmai.us
+0.0.0.0 e621.net
+0.0.0.0 eporner.com
+0.0.0.0 erome.com
+0.0.0.0 gelbooru.com
+0.0.0.0 hanime.tv
+0.0.0.0 heavy-r.com
+0.0.0.0 hentaihaven.xxx
+0.0.0.0 hitomi.la
+0.0.0.0 hqporner.com
+0.0.0.0 kemono.party
+0.0.0.0 kemono.su
+0.0.0.0 livejasmin.com
+0.0.0.0 motherless.com
+0.0.0.0 nhentai.net
+0.0.0.0 onlyfans.com
+0.0.0.0 pornhub.com
+0.0.0.0 redtube.com
+0.0.0.0 rule34.xxx
+0.0.0.0 spankbang.com
+0.0.0.0 stripchat.com
+0.0.0.0 tsumino.com
+0.0.0.0 tube8.com
+0.0.0.0 xhamster.com
+0.0.0.0 xnxx.com
+0.0.0.0 xvideos.com
+0.0.0.0 youporn.com
+3dbooru.com
+4tube.com
+admireme.vip
+amaterky.cz
+asmhentai.com
+bangbros.com
+beeg.com
+blacked.com
+bongacams.com
+brazzers.com
+bunkr.is
+bunkr.ru
+cam4.com
+camsoda.com
+ceske-kurvicky.cz
+chaturbate.com
+coomer.party
+coomer.su
+daftsex.com
+danbooru.donmai.us
+deeper.com
+digitalplayground.com
+e-hentai.org
+e621.net
+eporner.com
+erome.com
+erotik.cz
+evilangel.com
+exhentai.org
+fakehub.com
+fakku.net
+fansly.com
+fapello.com
+faphero.com
+flirt4free.com
+freevideo.cz
+fuq.com
+gelbooru.com
+hanime.tv
+heavy-r.com
+hentaihaven.xxx
+hentaivn.net
+hitomi.la
+hqporner.com
+imlive.com
+jerkmate.com
+kemono.party
+kemono.su
+leakgirls.com
+libimseti.cz
+livejasmin.com
+loyalfans.com
+manyvids.com
+mofos.com
+motherless.com
+multporn.net
+myfreecams.com
+naughtyamerica.com
+nhentai.net
+onlyfans.com
+pornhub.com
+porno-zdarma.cz
+porntrex.com
+pururin.io
+realitykings.com
+redtube.com
+rule34.xxx
+rule34video.com
+sex.cz
+sexbazar.cz
+sexcesky.cz
+simpcity.su
+spankbang.com
+streamate.com
+stripchat.com
+thothub.to
+thumbzilla.com
+tsumino.com
+tube8.com
+tubehd.com
+tushy.com
+twistys.com
+txxx.com
+vixen.com
+vporn.com
+xgroovy.com
+xhamster.com
+xnxx.com
+xvideos.com
+youporn.com

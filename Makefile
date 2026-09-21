@@ -1,9 +1,15 @@
-.PHONY: all run test clean install
+.PHONY: all run test clean install android android-install
 
 all:
 	$(MAKE) -C core/engine_shared
 	$(MAKE) -C platform/linux
 	$(MAKE) -C apps/browser_extension
+
+android:
+	$(MAKE) -C platform/android build
+
+android-install:
+	$(MAKE) -C platform/android launch-device
 
 run: all
 	@echo "=== Starting Degoonification Daemon ==="

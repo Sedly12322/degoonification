@@ -36,7 +36,9 @@ apps/mobile_desktop_client/.pub/
 *.apk
 *.aab
 .gradle/
+**/build/
 local.properties
+platform/android/app/src/main/assets/*.onnx
 
 # IDEs
 .idea/

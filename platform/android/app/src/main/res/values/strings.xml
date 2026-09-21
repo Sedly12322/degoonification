@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Degoonification</string>
+    <string name="defense_active">SYSTEM DEFENSE ACTIVE</string>
+    <string name="air_gapped_label">100% On-Device Air-Gapped</string>
+    <string name="streak_days_clean">DAYS CLEAN</string>
+    <string name="visual_blur">Visual Blur</string>
+    <string name="dns_sinkhole">DNS Sinkhole</string>
+    <string name="anti_tamper">Anti-Tamper</string>
+    <string name="start_defense">START FULL DEFENSE</string>
+    <string name="stop_defense">STOP DEFENSE</string>
+    <string name="grant_permissions">SETUP PERMISSIONS</string>
+    <string name="device_admin_label">Degoonification Shield</string>
+    <string name="device_admin_description">Prevents unauthorized uninstallation and tampering during recovery periods.</string>
+    <string name="accessibility_service_description">Monitors settings to prevent force-stopping the real-time AI visual shield.</string>
+    <string name="notification_title">Degoonification Active</string>
+    <string name="notification_text">Real-time AI visual shield and DNS sinkhole running.</string>
+</resources>
