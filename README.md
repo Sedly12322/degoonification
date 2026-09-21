@@ -45,9 +45,30 @@ degoonification/
 
 ---
 
-## 🛠️ Building Core Engine
+## 🚀 Running on Linux (Arch / Hyprland / Wayland)
 
+### Quick Start
+To build and launch the daemon in one command:
 ```bash
-cd core/engine_shared
+cd ~/degoonification
+./run.sh
+```
+Or using make:
+```bash
+make run
+```
+
+### Running System Tests
+```bash
 make test
+```
+
+### Optional: Enable System-Wide DNS Sinkhole
+To redirect all outbound port 53 traffic to the local in-memory sinkhole (`127.0.0.1:5353`):
+```bash
+sudo ./platform/linux/network/redirect_dns.sh enable
+```
+To disable:
+```bash
+sudo ./platform/linux/network/redirect_dns.sh disable
 ```
