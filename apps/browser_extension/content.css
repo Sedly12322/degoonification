@@ -5,8 +5,26 @@
   --degoon-dark-bg: #0f172a;
 }
 
-/* Hardware-accelerated GPU Blur for detected media */
-.degoon-blurred-media {
+/* Global Adult Site Blur: Every media element is blurred instantly */
+.degoon-nsfw-site img,
+.degoon-nsfw-site video,
+.degoon-nsfw-site canvas,
+.degoon-nsfw-site picture,
+.degoon-nsfw-site iframe,
+.degoon-nsfw-site [style*="background"] {
+  filter: blur(var(--degoon-blur-radius, 32px)) !important;
+  will-change: filter !important;
+  transform: translateZ(0) !important;
+  transition: filter 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Specific blurred media */
+.degoon-blurred-media,
+[data-nsfw="true"] img,
+[data-nsfw="true"] video,
+.nsfw img,
+.nsfw video,
+shredder-media-item {
   filter: blur(var(--degoon-blur-radius)) !important;
   will-change: filter, transform !important;
   transform: translateZ(0) !important;
@@ -16,8 +34,10 @@
 }
 
 /* Hover reveal if allowed in options */
-.degoon-blurred-media.degoon-allow-peek:hover {
-  filter: blur(6px) !important;
+.degoon-blurred-media.degoon-allow-peek:hover,
+.degoon-nsfw-site.degoon-allow-peek img:hover,
+.degoon-nsfw-site.degoon-allow-peek video:hover {
+  filter: blur(8px) !important;
 }
 
 /* Video wrapper shield */
@@ -50,7 +70,7 @@
   backdrop-filter: blur(8px) !important;
 }
 
-/* Hide scrollbar flicker */
+/* Hide elements */
 .degoon-hidden {
   display: none !important;
 }

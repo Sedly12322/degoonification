@@ -15,6 +15,7 @@
     "webRequest",
     "webRequestBlocking"
   ],
+  "incognito": "spanning",
   "background": {
     "scripts": ["background.js"],
     "persistent": true
