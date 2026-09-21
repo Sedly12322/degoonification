@@ -1,11 +1,11 @@
 CXX ?= g++
-CXXFLAGS ?= -std=c++20 -O3 -Wall -Wextra -Wpedantic -fPIC -I/usr/include/onnxruntime -I../../../core/engine_shared/include
-LDFLAGS ?= -lonnxruntime
+CXXFLAGS ?= -std=c++20 -O3 -Wall -Wextra -Wno-pedantic -fPIC $(shell pkg-config --cflags libpipewire-0.3)
+LDFLAGS ?= $(shell pkg-config --libs libpipewire-0.3)
 
 BUILD_DIR = build
 BIN_DIR = bin
 
-OBJS = $(BUILD_DIR)/onnx_detector.o $(BUILD_DIR)/image_preprocessor.o
+OBJS = $(BUILD_DIR)/pipewire_capture.o
 
 .PHONY: all clean
 
