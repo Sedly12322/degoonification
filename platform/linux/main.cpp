@@ -1,4 +1,5 @@
 #include "capture/pipewire_capture.hpp"
+#include "capture/screencopy_capture.hpp"
 #include "inference/onnx_detector.hpp"
 #include "inference/image_preprocessor.hpp"
 #include "overlay/wayland_overlay.hpp"
@@ -9,6 +10,7 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <mutex>
 #include <csignal>
 #include <atomic>
 #include <sstream>
@@ -148,27 +150,69 @@ int main(int argc, char** argv) {
         std::cout << "[Init] AI Detector loaded successfully with hardware acceleration.\n";
     }
 
-    // 8. Initialize PipeWire Capture (Phase 1)
-    std::cout << "[Init] Initializing PipeWire DMA-BUF screen capture...\n";
-    linux_backend::PipeWireCapture capture(linux_backend::PipeWireConfig{
-        .target_node_id = 0,
-        .target_fps = 15,
-        .request_dmabuf = true
-    });
+    // 8. Start Screen Capture & AI Detection Thread
+    std::mutex boxes_mutex;
+    std::vector<core::BoundingBox> latest_raw_boxes;
+    std::atomic<uint64_t> total_frames_analyzed{0};
+    std::atomic<uint32_t> current_fps{12};
+    std::atomic<bool> worker_running{true};
+    bool visual_blur_paused = false;
 
-    if (!capture.init()) {
-        std::cerr << "[Warning] PipeWire capture init failed. Running event loop in idle mode.\n";
-    }
+    std::cout << "[Init] Starting Wayland screen capture & AI detection thread...\n";
+    std::thread ai_thread([&]() {
+        linux_backend::ScreencopyCapture screencap;
+        linux_backend::ImagePreprocessor preprocessor(640, 640);
+        linux_backend::VideoFrame frame;
+        std::vector<float> planar_rgb;
+
+        uint64_t frame_count = 0;
+        uint64_t total_count = 0;
+        auto fps_timer = std::chrono::steady_clock::now();
+
+        while (worker_running.load() && g_running.load()) {
+            auto loop_start = std::chrono::steady_clock::now();
+
+            if (!visual_blur_paused && model_loaded) {
+                if (screencap.capture_frame(frame)) {
+                    preprocessor.preprocess(frame, planar_rgb);
+                    auto detected_boxes = detector.detect(planar_rgb.data());
+
+                    {
+                        std::lock_guard<std::mutex> lock(boxes_mutex);
+                        latest_raw_boxes = std::move(detected_boxes);
+                    }
+
+                    frame_count++;
+                    total_count++;
+                    total_frames_analyzed.store(total_count, std::memory_order_relaxed);
+                }
+            } else {
+                std::lock_guard<std::mutex> lock(boxes_mutex);
+                latest_raw_boxes.clear();
+            }
+
+            auto now_tp = std::chrono::steady_clock::now();
+            auto elapsed_sec = std::chrono::duration<double>(now_tp - fps_timer).count();
+            if (elapsed_sec >= 1.0) {
+                current_fps.store(static_cast<uint32_t>(frame_count / elapsed_sec), std::memory_order_relaxed);
+                frame_count = 0;
+                fps_timer = now_tp;
+            }
+
+            auto process_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - loop_start).count();
+            int sleep_ms = 85 - static_cast<int>(process_time); // ~12 FPS
+            if (sleep_ms > 10) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+            }
+        }
+    });
 
     std::cout << "[Ready] System active across all subsystems. Press Ctrl+C to exit.\n";
 
-    bool visual_blur_paused = false;
     uint32_t active_box_count = 0;
-    uint64_t total_frames_analyzed = 0;
     std::string last_event = "Defense active and monitoring screen";
 
     // Main event loop
-    uint64_t last_tick = get_current_time_ms();
     while (g_running.load()) {
         uint64_t now_ms = get_current_time_ms();
 
@@ -187,10 +231,10 @@ int main(int argc, char** argv) {
                 std::ostringstream ss;
                 ss << "paused=" << (visual_blur_paused ? "1" : "0") << "\n";
                 ss << "active_boxes=" << active_box_count << "\n";
-                ss << "fps=" << 15 << "\n";
+                ss << "fps=" << current_fps.load() << "\n";
                 ss << "padding_ratio=" << padding_ratio << "\n";
                 ss << "uptime=" << uptime << "\n";
-                ss << "total_frames=" << total_frames_analyzed << "\n";
+                ss << "total_frames=" << total_frames_analyzed.load() << "\n";
                 ss << "dns_total=" << stats.total_queries << "\n";
                 ss << "dns_blocked=" << stats.blocked_queries << "\n";
                 ss << "dns_forwarded=" << stats.forwarded_queries << "\n";
@@ -234,24 +278,36 @@ int main(int argc, char** argv) {
             return "UNKNOWN_COMMAND\n";
         });
 
-        // 2. Process Wayland events
+        // 2. Process Wayland events non-blockingly
         overlay.dispatch_events();
 
-        // 3. Periodic tracker update / box expiration
-        if (now_ms - last_tick >= 100) {
-            if (!visual_blur_paused) {
-                auto active_boxes = tracker.process_frame({}, now_ms);
-                active_box_count = active_boxes.size();
-                overlay.render_boxes(active_boxes);
+        // 3. Update temporal smoothing tracker and render boxes onto screen
+        std::vector<core::BoundingBox> current_detections;
+        {
+            std::lock_guard<std::mutex> lock(boxes_mutex);
+            current_detections = latest_raw_boxes;
+        }
+
+        if (!visual_blur_paused) {
+            auto active_boxes = tracker.process_frame(current_detections, now_ms);
+            active_box_count = active_boxes.size();
+            overlay.render_boxes(active_boxes);
+            if (active_box_count > 0) {
+                last_event = "BLUR SHIELD ACTIVE: " + std::to_string(active_box_count) + " explicit region(s) blocked";
             }
-            last_tick = now_ms;
+        } else {
+            overlay.render_boxes({});
+            active_box_count = 0;
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 FPS dispatch
     }
 
     std::cout << "\n[Shutdown] Cleaning up resources...\n";
-    capture.stop();
+    worker_running.store(false);
+    if (ai_thread.joinable()) {
+        ai_thread.join();
+    }
     dns_server.stop();
     ipc_server.stop();
     overlay.render_boxes({}); // Clear screen

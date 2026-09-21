@@ -26,6 +26,7 @@ BIN_DIR = bin
 
 DAEMON_OBJS = \
 	$(BUILD_DIR)/pipewire_capture.o \
+	$(BUILD_DIR)/screencopy_capture.o \
 	$(BUILD_DIR)/onnx_detector.o \
 	$(BUILD_DIR)/image_preprocessor.o \
 	$(BUILD_DIR)/xdg-shell-protocol.o \
@@ -60,6 +61,9 @@ $(BIN_DIR):
 	$(MAKE) -C ../../core/engine_shared
 
 $(BUILD_DIR)/pipewire_capture.o: capture/pipewire_capture.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/screencopy_capture.o: capture/screencopy_capture.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/onnx_detector.o: inference/onnx_detector.cpp | $(BUILD_DIR)

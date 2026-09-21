@@ -23,8 +23,10 @@ void ImagePreprocessor::preprocess(const VideoFrame& frame, std::vector<float>& 
     const float scale_y = static_cast<float>(frame.height) / static_cast<float>(target_height_);
     const float norm_factor = 1.0f / 255.0f;
 
-    const uint32_t stride = frame.stride > 0 ? frame.stride : (frame.width * 4);
+    const bool is_rgb24 = (frame.format == PixelFormat::RGB);
     const bool is_bgra = (frame.format == PixelFormat::BGRA || frame.format == PixelFormat::BGRx);
+    const int bpp = is_rgb24 ? 3 : 4;
+    const uint32_t stride = frame.stride > 0 ? frame.stride : (frame.width * bpp);
 
     for (int y = 0; y < target_height_; ++y) {
         uint32_t src_y = std::min(static_cast<uint32_t>(y * scale_y), frame.height - 1);
@@ -33,20 +35,25 @@ void ImagePreprocessor::preprocess(const VideoFrame& frame, std::vector<float>& 
 
         for (int x = 0; x < target_width_; ++x) {
             uint32_t src_x = std::min(static_cast<uint32_t>(x * scale_x), frame.width - 1);
-            const uint8_t* px = row_ptr + (src_x * 4);
+            const uint8_t* px = row_ptr + (src_x * bpp);
 
             float c0 = px[0] * norm_factor;
             float c1 = px[1] * norm_factor;
             float c2 = px[2] * norm_factor;
 
             size_t idx = row_offset + x;
-            if (is_bgra) {
+            if (is_rgb24) {
+                // px[0]=R, px[1]=G, px[2]=B
+                r_plane[idx] = c0;
+                g_plane[idx] = c1;
+                b_plane[idx] = c2;
+            } else if (is_bgra) {
                 // px[0]=B, px[1]=G, px[2]=R
                 r_plane[idx] = c2;
                 g_plane[idx] = c1;
                 b_plane[idx] = c0;
             } else {
-                // px[0]=R, px[1]=G, px[2]=B
+                // px[0]=R, px[1]=G, px[2]=B (RGBA)
                 r_plane[idx] = c0;
                 g_plane[idx] = c1;
                 b_plane[idx] = c2;

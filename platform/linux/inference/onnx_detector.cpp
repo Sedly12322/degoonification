@@ -75,18 +75,26 @@ bool OnnxDetector::init() {
 }
 
 bool OnnxDetector::is_explicit_class(int32_t class_id) noexcept {
-    // Classes based on standard NSFW YOLO detector:
+    // Classes from YOLOv8n-NSFW model:
+    // 0: FEMALE_GENITALIA_COVERED
     // 2: BUTTOCKS_EXPOSED
     // 3: FEMALE_BREAST_EXPOSED
     // 4: FEMALE_GENITALIA_EXPOSED
     // 6: ANUS_EXPOSED
     // 14: MALE_GENITALIA_EXPOSED
+    // 15: ANUS_COVERED
+    // 16: FEMALE_BREAST_COVERED
+    // 17: BUTTOCKS_COVERED
     switch (class_id) {
-        case 2: // BUTTOCKS_EXPOSED
-        case 3: // FEMALE_BREAST_EXPOSED
-        case 4: // FEMALE_GENITALIA_EXPOSED
-        case 6: // ANUS_EXPOSED
-        case 14: // MALE_GENITALIA_EXPOSED
+        case 0:
+        case 2:
+        case 3:
+        case 4:
+        case 6:
+        case 14:
+        case 15:
+        case 16:
+        case 17:
             return true;
         default:
             return false;

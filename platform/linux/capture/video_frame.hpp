@@ -11,6 +11,7 @@ enum class PixelFormat {
     BGRA,
     RGBx,
     BGRx,
+    RGB,
     UNKNOWN
 };
 

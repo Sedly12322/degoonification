@@ -8,7 +8,7 @@
 namespace degoonification::linux_backend {
 
 struct OverlayConfig {
-    uint32_t frosted_color_argb{0xEE111827}; // Dark frosted privacy blur fill
+    uint32_t frosted_color_argb{0xFF0F172A}; // 100% opaque dark slate privacy shield
     bool enable_clickthrough{true};
 };
 

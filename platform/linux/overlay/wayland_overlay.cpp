@@ -34,6 +34,7 @@ struct WaylandOverlay::Impl {
 
     ShmBuffer buffers[2];
     int current_buffer{0};
+    bool had_boxes{false};
 };
 
 static void buffer_release(void* data, wl_buffer* wl_buffer) {
@@ -213,6 +214,10 @@ bool WaylandOverlay::init() {
 void WaylandOverlay::render_boxes(const std::vector<core::BoundingBox>& boxes) {
     if (!impl_ || !impl_->surface || !impl_->configured) return;
 
+    if (boxes.empty() && !impl_->had_boxes) {
+        return; // Already cleared, skip redundant composite work
+    }
+
     impl_->current_buffer = 1 - impl_->current_buffer;
     ShmBuffer& buf = impl_->buffers[impl_->current_buffer];
 
@@ -237,6 +242,9 @@ void WaylandOverlay::render_boxes(const std::vector<core::BoundingBox>& boxes) {
                 }
             }
         }
+        impl_->had_boxes = true;
+    } else {
+        impl_->had_boxes = false;
     }
 
     wl_surface_attach(impl_->surface, buf.wl_buf, 0, 0);

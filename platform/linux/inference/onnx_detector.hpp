@@ -10,7 +10,7 @@ namespace degoonification::linux_backend {
 
 struct DetectorConfig {
     std::string model_path{"core/models/yolov8n-nsfw.onnx"};
-    float confidence_threshold{0.35f};
+    float confidence_threshold{0.25f};
     float nms_iou_threshold{0.45f};
     int input_width{640};
     int input_height{640};
