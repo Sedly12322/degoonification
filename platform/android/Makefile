@@ -3,14 +3,14 @@ export ANDROID_HOME ?= $(HOME)/.local/share/android-sdk
 export PATH := $(JAVA_HOME)/bin:$(ANDROID_HOME)/cmdline-tools/latest/bin:$(ANDROID_HOME/platform-tools):$(HOME)/.local/bin:$(PATH)
 
 GRADLE = $(HOME)/.local/bin/gradle
-APK_PATH = app/build/outputs/apk/debug/app-debug.apk
+APK_PATH = app/build/outputs/apk/release/app-release.apk
 
 .PHONY: all build clean install-device launch-device
 
 all: build
 
 build:
-	$(GRADLE) assembleDebug
+	$(GRADLE) assembleRelease
 
 clean:
 	$(GRADLE) clean
