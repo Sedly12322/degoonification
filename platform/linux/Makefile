@@ -9,12 +9,14 @@ CXXFLAGS ?= -std=c++20 -O3 -Wall -Wextra -Wno-pedantic -fPIC \
 	-Ioverlay/protocols \
 	-Inetwork \
 	-Iwatchdog \
+	-Iipc \
+	-Icli \
 	-I/usr/include/onnxruntime \
 	$(shell pkg-config --cflags libpipewire-0.3 wayland-client)
 
 CFLAGS ?= -O3 -fPIC $(shell pkg-config --cflags wayland-client) -Ioverlay/protocols
 
-LDFLAGS ?= \
+LDFLAGS_DAEMON ?= \
 	../../core/engine_shared/bin/libengine_shared.a \
 	-lonnxruntime \
 	$(shell pkg-config --libs libpipewire-0.3 wayland-client)
@@ -22,7 +24,7 @@ LDFLAGS ?= \
 BUILD_DIR = build
 BIN_DIR = bin
 
-OBJS = \
+DAEMON_OBJS = \
 	$(BUILD_DIR)/pipewire_capture.o \
 	$(BUILD_DIR)/onnx_detector.o \
 	$(BUILD_DIR)/image_preprocessor.o \
@@ -33,13 +35,20 @@ OBJS = \
 	$(BUILD_DIR)/dns_server.o \
 	$(BUILD_DIR)/anti_tamper.o \
 	$(BUILD_DIR)/watchdog_supervisor.o \
+	$(BUILD_DIR)/ipc_server.o \
 	$(BUILD_DIR)/main.o
 
-TARGET = $(BIN_DIR)/degoonification-daemon
+CLI_OBJS = \
+	$(BUILD_DIR)/ipc_client.o \
+	$(BUILD_DIR)/tui_dashboard.o \
+	$(BUILD_DIR)/main_cli.o
+
+DAEMON_TARGET = $(BIN_DIR)/degoonification-daemon
+CLI_TARGET = $(BIN_DIR)/degoon
 
 .PHONY: all clean
 
-all: $(TARGET)
+all: $(DAEMON_TARGET) $(CLI_TARGET)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -80,11 +89,26 @@ $(BUILD_DIR)/anti_tamper.o: watchdog/anti_tamper.cpp | $(BUILD_DIR)
 $(BUILD_DIR)/watchdog_supervisor.o: watchdog/watchdog_supervisor.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/ipc_server.o: ipc/ipc_server.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/main.o: main.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TARGET): $(OBJS) ../../core/engine_shared/bin/libengine_shared.a | $(BIN_DIR)
-	$(CXX) $(OBJS) $(LDFLAGS) -o $@
+$(BUILD_DIR)/ipc_client.o: cli/ipc_client.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/tui_dashboard.o: cli/tui_dashboard.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/main_cli.o: cli/main_cli.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(DAEMON_TARGET): $(DAEMON_OBJS) ../../core/engine_shared/bin/libengine_shared.a | $(BIN_DIR)
+	$(CXX) $(DAEMON_OBJS) $(LDFLAGS_DAEMON) -o $@
+
+$(CLI_TARGET): $(CLI_OBJS) | $(BIN_DIR)
+	$(CXX) $(CLI_OBJS) -o $@
 
 clean:
 	rm -rf $(BUILD_DIR) $(BIN_DIR)

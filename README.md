@@ -45,6 +45,42 @@ degoonification/
 
 ---
 
+## 💻 Degoonification CLI & TUI Interface (`degoon`)
+
+The native command-line suite communicates with the running daemon over an ultra-low latency UNIX Domain Socket (`/run/user/<UID>/degoon.sock`).
+
+### 🎮 Interactive Fullscreen TUI Dashboard
+Launch the live terminal monitoring dashboard:
+```bash
+degoon tui
+# or simply:
+degoon
+```
+**Interactive Hotkeys:**
+- `[p]` Pause / Resume visual screen blur
+- `[+]` / `[-]` Increase / decrease dynamic box padding (+10% to +35%)
+- `[r]` Log a relapse & reset streak
+- `[q]` Exit TUI dashboard (daemon continues running silently in the background)
+
+---
+
+### ⌨️ CLI Subcommands
+
+| Command | Description |
+| :--- | :--- |
+| `degoon status` | Displays formatted status banner, active blur boxes, FPS, and streak |
+| `degoon tui` | Opens the live interactive TUI dashboard |
+| `degoon start` | Launches the daemon in background |
+| `degoon stop` | Gracefully stops the running daemon |
+| `degoon restart` | Restarts the background daemon |
+| `degoon pause` | Temporarily pauses screen blur |
+| `degoon resume` | Resumes screen blur |
+| `degoon streak` | Shows days clean, recovery milestones, and dopamine restoration stage |
+| `degoon relapse [reason]` | Records relapse trigger notes and resets current streak |
+| `degoon padding <ratio>` | Sets dynamic bounding box expansion ratio (e.g. `0.20` for +20%) |
+
+---
+
 ## 🚀 Running on Linux (Arch / Hyprland / Wayland)
 
 ### Quick Start
@@ -53,10 +89,11 @@ To build and launch the daemon in one command:
 cd ~/degoonification
 ./run.sh
 ```
-Or using make:
+Or install system-wide / user-wide:
 ```bash
-make run
+make install
 ```
+*(Installs `degoon` and `degoonification-daemon` to `~/.local/bin/`)*
 
 ### Running System Tests
 ```bash
