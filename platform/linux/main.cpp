@@ -26,9 +26,46 @@ static uint64_t get_current_time_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 }
 
+static std::string resolve_model_path(const std::string& override_path) {
+    if (!override_path.empty() && access(override_path.c_str(), R_OK) == 0) {
+        return override_path;
+    }
+    const char* home = getenv("HOME");
+    std::vector<std::string> candidates;
+    if (home) {
+        candidates.push_back(std::string(home) + "/.local/share/degoonification/models/yolov8n-nsfw.onnx");
+        candidates.push_back(std::string(home) + "/degoonification/core/models/yolov8n-nsfw.onnx");
+    }
+    candidates.push_back("/usr/local/share/degoonification/models/yolov8n-nsfw.onnx");
+    candidates.push_back("core/models/yolov8n-nsfw.onnx");
+
+    for (const auto& path : candidates) {
+        if (access(path.c_str(), R_OK) == 0) return path;
+    }
+    return candidates.empty() ? "core/models/yolov8n-nsfw.onnx" : candidates.front();
+}
+
+static std::string resolve_blocklist_path() {
+    const char* home = getenv("HOME");
+    std::vector<std::string> candidates;
+    if (home) {
+        candidates.push_back(std::string(home) + "/.local/share/degoonification/blocklists/default_domains.txt");
+        candidates.push_back(std::string(home) + "/degoonification/core/blocklists/default_domains.txt");
+    }
+    candidates.push_back("/usr/local/share/degoonification/blocklists/default_domains.txt");
+    candidates.push_back("core/blocklists/default_domains.txt");
+
+    for (const auto& path : candidates) {
+        if (access(path.c_str(), R_OK) == 0) return path;
+    }
+    return candidates.empty() ? "core/blocklists/default_domains.txt" : candidates.front();
+}
+
 int main(int argc, char** argv) {
     std::signal(SIGINT, sigint_handler);
     std::signal(SIGTERM, sigint_handler);
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
 
     auto start_time_tp = std::chrono::steady_clock::now();
     auto streak_start_tp = std::chrono::system_clock::now();
@@ -53,13 +90,14 @@ int main(int argc, char** argv) {
     }
 
     // 3. Initialize Sub-millisecond DNS Sinkhole (Phase 4)
-    std::cout << "[Init] Starting Local DNS Sinkhole on 127.0.0.1:5353...\n";
+    std::string blocklist_path = resolve_blocklist_path();
+    std::cout << "[Init] Starting Local DNS Sinkhole on 127.0.0.1:5353 (Blocklist: " << blocklist_path << ")...\n";
     network::DnsServer dns_server(network::DnsServerConfig{
         .listen_ip = "127.0.0.1",
         .listen_port = 5353,
         .upstream_dns_ip = "1.1.1.1",
         .upstream_dns_port = 53,
-        .blocklist_path = "core/blocklists/default_domains.txt"
+        .blocklist_path = blocklist_path
     });
 
     if (dns_server.init() && dns_server.start()) {
@@ -91,7 +129,7 @@ int main(int argc, char** argv) {
     std::vector<float> planar_rgb;
 
     // 7. Initialize AI Inference Engine (Phase 2)
-    std::string model_path = (argc > 1) ? argv[1] : "core/models/yolov8n-nsfw.onnx";
+    std::string model_path = resolve_model_path((argc > 1) ? argv[1] : "");
     std::cout << "[Init] Initializing ONNX Runtime AI Detector with model: " << model_path << "...\n";
     linux_backend::OnnxDetector detector(linux_backend::DetectorConfig{
         .model_path = model_path,

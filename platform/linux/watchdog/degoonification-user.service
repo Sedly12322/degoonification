@@ -1,0 +1,17 @@
+[Unit]
+Description=Degoonification Real-Time Protection Daemon (User Session)
+Documentation=https://github.com/Sedly12322/degoonification
+PartOf=graphical-session.target
+After=graphical-session.target pipewire.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/degoonification-daemon
+Restart=on-failure
+RestartSec=2s
+
+# Security hardening & memory dump protection
+LimitCORE=0
+
+[Install]
+WantedBy=default.target

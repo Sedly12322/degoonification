@@ -4,11 +4,53 @@
 #include <iomanip>
 #include <cstdlib>
 #include <unistd.h>
+#include <vector>
+#include <climits>
 
 using namespace degoonification;
 
 static void print_banner() {
     std::cout << "\033[1;36m🛡️  DEGOONIFICATION CLI \033[0m\033[90m// Real-Time System Defense & Self-Control\033[0m\n\n";
+}
+
+static void print_recent_logs(int lines = 20) {
+    std::string cmd = "tail -n " + std::to_string(lines) + " /tmp/degoon.log 2>/dev/null";
+    system(cmd.c_str());
+}
+
+static std::string find_daemon_executable() {
+    // 1. Check directory of current executable (/proc/self/exe)
+    char self_path[PATH_MAX] = {0};
+    ssize_t len = readlink("/proc/self/exe", self_path, sizeof(self_path) - 1);
+    if (len > 0) {
+        self_path[len] = '\0';
+        std::string dir(self_path);
+        size_t last_slash = dir.find_last_of('/');
+        if (last_slash != std::string::npos) {
+            std::string sibling = dir.substr(0, last_slash) + "/degoonification-daemon";
+            if (access(sibling.c_str(), X_OK) == 0) {
+                return sibling;
+            }
+        }
+    }
+
+    // 2. Check standard install and local paths
+    const char* home = getenv("HOME");
+    std::vector<std::string> candidates;
+    if (home) {
+        candidates.push_back(std::string(home) + "/.local/bin/degoonification-daemon");
+        candidates.push_back(std::string(home) + "/degoonification/platform/linux/bin/degoonification-daemon");
+    }
+    candidates.push_back("/usr/local/bin/degoonification-daemon");
+    candidates.push_back("./platform/linux/bin/degoonification-daemon");
+
+    for (const auto& path : candidates) {
+        if (access(path.c_str(), X_OK) == 0) {
+            return path;
+        }
+    }
+
+    return "degoonification-daemon";
 }
 
 static void print_help() {
@@ -21,6 +63,9 @@ static void print_help() {
     std::cout << "  \033[1;32mstart\033[0m                  Start the background daemon\n";
     std::cout << "  \033[1;32mstop\033[0m                   Stop the daemon cleanly\n";
     std::cout << "  \033[1;32mrestart\033[0m                Restart the daemon\n";
+    std::cout << "  \033[1;32mlogs\033[0m [lines]           Display daemon log output\n";
+    std::cout << "  \033[1;32menable\033[0m                 Enable daemon autostart on login (systemd user service)\n";
+    std::cout << "  \033[1;32mdisable\033[0m                Disable daemon autostart on login\n";
     std::cout << "  \033[1;32mpause\033[0m                  Temporarily pause visual screen blur\n";
     std::cout << "  \033[1;32mresume\033[0m                 Resume visual screen blur\n";
     std::cout << "  \033[1;32mstreak\033[0m                 Display days clean, milestones, and dopamine recovery progress\n";
@@ -132,31 +177,120 @@ int main(int argc, char** argv) {
             std::cerr << "✗ Failed to log relapse.\n";
         }
     } else if (cmd == "stop") {
-        if (client.stop_daemon()) {
-            std::cout << "✓ Degoonification daemon stopped gracefully.\n";
+        bool stopped = false;
+        if (client.is_daemon_running()) {
+            stopped = client.stop_daemon();
+        }
+        int sys_ret = system("systemctl --user stop degoonification 2>/dev/null");
+        if (stopped || sys_ret == 0) {
+            std::cout << "\033[1;32m✓ Degoonification daemon stopped gracefully.\033[0m\n";
         } else {
-            std::cerr << "✗ Failed to stop daemon or already stopped.\n";
+            std::cout << "Daemon is not currently running.\n";
         }
     } else if (cmd == "start") {
         if (client.is_daemon_running()) {
-            std::cout << "Daemon is already running.\n";
+            std::cout << "\033[1;33m● Daemon is already running.\033[0m\n";
+            std::cout << "  Run '\033[1;32mdegoon status\033[0m' or '\033[1;32mdegoon tui\033[0m' to inspect.\n";
         } else {
-            std::cout << "Starting daemon in background...\n";
-            int ret = system("nohup ./platform/linux/bin/degoonification-daemon >/dev/null 2>&1 &");
-            (void)ret;
-            usleep(300000); // 300ms
-            if (client.is_daemon_running()) {
-                std::cout << "✓ Degoonification daemon started successfully!\n";
+            std::string daemon_bin = find_daemon_executable();
+            std::cout << "Starting degoonification daemon...\n";
+
+            // 1. Try systemd user unit first
+            int sys_ret = system("systemctl --user start degoonification 2>/dev/null");
+            if (sys_ret != 0) {
+                // 2. Try systemd-run --user
+                std::string srun_cmd = "systemd-run --user --unit=degoonification " + daemon_bin + " >/dev/null 2>&1";
+                sys_ret = system(srun_cmd.c_str());
+                if (sys_ret != 0) {
+                    // 3. Fallback to nohup
+                    std::string launch_cmd = "nohup " + daemon_bin + " >> /tmp/degoon.log 2>&1 &";
+                    (void)system(launch_cmd.c_str());
+                }
+            }
+
+            bool active = false;
+            for (int i = 0; i < 15; ++i) {
+                usleep(150000); // 150ms
+                if (client.is_daemon_running()) {
+                    active = true;
+                    break;
+                }
+            }
+
+            if (active) {
+                std::cout << "\033[1;32m✓ Degoonification daemon started successfully!\033[0m\n";
+                std::cout << "  Socket: " << ipc::get_socket_path() << "\n";
+                std::cout << "  Logs:   'degoon logs' or journalctl --user -u degoonification -f\n";
+                std::cout << "  Run '\033[1;32mdegoon status\033[0m' or '\033[1;32mdegoon tui\033[0m' to view live metrics.\n";
             } else {
-                std::cout << "✓ Launch command initiated. Check status with 'degoon status'.\n";
+                std::cout << "\033[1;31m✗ Failed to connect to daemon socket after start.\033[0m\n";
+                std::cout << "  Recent log output:\n";
+                std::cout << "  --------------------------------------------------\n";
+                system("journalctl --user -u degoonification -n 15 --no-pager 2>/dev/null || tail -n 15 /tmp/degoon.log 2>/dev/null");
+                std::cout << "  --------------------------------------------------\n";
+                std::cout << "  Try running manually: " << daemon_bin << "\n";
             }
         }
     } else if (cmd == "restart") {
-        client.stop_daemon();
-        usleep(400000);
-        system("nohup ./platform/linux/bin/degoonification-daemon >/dev/null 2>&1 &");
-        usleep(300000);
-        std::cout << "✓ Daemon restarted.\n";
+        if (client.is_daemon_running()) {
+            std::cout << "Stopping running daemon...\n";
+            client.stop_daemon();
+            system("systemctl --user stop degoonification 2>/dev/null");
+            for (int i = 0; i < 10; ++i) {
+                usleep(150000);
+                if (!client.is_daemon_running()) break;
+            }
+        }
+        std::string daemon_bin = find_daemon_executable();
+        std::cout << "Starting degoonification daemon...\n";
+        int sys_ret = system("systemctl --user restart degoonification 2>/dev/null");
+        if (sys_ret != 0) {
+            std::string srun_cmd = "systemd-run --user --unit=degoonification " + daemon_bin + " >/dev/null 2>&1";
+            sys_ret = system(srun_cmd.c_str());
+            if (sys_ret != 0) {
+                std::string launch_cmd = "nohup " + daemon_bin + " >> /tmp/degoon.log 2>&1 &";
+                (void)system(launch_cmd.c_str());
+            }
+        }
+        bool active = false;
+        for (int i = 0; i < 15; ++i) {
+            usleep(150000);
+            if (client.is_daemon_running()) {
+                active = true;
+                break;
+            }
+        }
+        if (active) {
+            std::cout << "\033[1;32m✓ Daemon restarted successfully.\033[0m\n";
+        } else {
+            std::cout << "\033[1;31m✗ Daemon failed to restart.\033[0m Check 'degoon logs'.\n";
+        }
+    } else if (cmd == "enable") {
+        int ret = system("systemctl --user enable degoonification 2>/dev/null");
+        if (ret == 0) {
+            std::cout << "\033[1;32m✓ Autostart enabled:\033[0m Degoonification will start automatically on login.\n";
+        } else {
+            std::cerr << "✗ Failed to enable autostart. Run 'make install' to set up systemd user service.\n";
+        }
+    } else if (cmd == "disable") {
+        int ret = system("systemctl --user disable degoonification 2>/dev/null");
+        if (ret == 0) {
+            std::cout << "\033[1;32m✓ Autostart disabled:\033[0m Degoonification will not start automatically on login.\n";
+        } else {
+            std::cerr << "✗ Failed to disable autostart.\n";
+        }
+    } else if (cmd == "logs" || cmd == "log") {
+        print_banner();
+        int lines = (argc >= 3) ? std::atoi(argv[2]) : 30;
+        if (lines <= 0) lines = 30;
+        std::cout << "\033[1;37mRecent Daemon Logs (last " << lines << " lines):\033[0m\n";
+        std::cout << "------------------------------------------------------------\n";
+        std::string cmd_str = "journalctl --user -u degoonification -n " + std::to_string(lines) + " --no-pager 2>/dev/null";
+        int jret = system(cmd_str.c_str());
+        if (jret != 0) {
+            print_recent_logs(lines);
+        }
+        std::cout << "------------------------------------------------------------\n";
     } else {
         print_help();
     }
