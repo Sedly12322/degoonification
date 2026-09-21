@@ -15,6 +15,7 @@
 #include <csignal>
 #include <atomic>
 #include <sstream>
+#include <cstring>
 
 using namespace degoonification;
 
@@ -151,6 +152,8 @@ int main(int argc, char** argv) {
     // 7. Start Screen Capture & AI Detection Thread
     std::mutex boxes_mutex;
     std::vector<core::BoundingBox> latest_rendered_boxes;
+    linux_backend::VideoFrame shared_frame;
+    std::vector<uint8_t> shared_frame_buf;
     std::atomic<uint64_t> raw_frame_seq{0};
     std::atomic<uint64_t> total_frames_analyzed{0};
     std::atomic<uint32_t> current_fps{15};
@@ -182,6 +185,14 @@ int main(int argc, char** argv) {
                     {
                         std::lock_guard<std::mutex> lock(boxes_mutex);
                         latest_rendered_boxes = std::move(active_boxes);
+                        if (!latest_rendered_boxes.empty() && frame.data && frame.data_size > 0) {
+                            if (shared_frame_buf.size() < frame.data_size) {
+                                shared_frame_buf.resize(frame.data_size);
+                            }
+                            std::memcpy(shared_frame_buf.data(), frame.data, frame.data_size);
+                            shared_frame = frame;
+                            shared_frame.data = shared_frame_buf.data();
+                        }
                     }
                     raw_frame_seq.fetch_add(1, std::memory_order_release);
 
@@ -293,15 +304,17 @@ int main(int argc, char** argv) {
 
         if (is_new_frame) {
             std::vector<core::BoundingBox> current_boxes;
+            linux_backend::VideoFrame current_frame;
             {
                 std::lock_guard<std::mutex> lock(boxes_mutex);
                 current_boxes = latest_rendered_boxes;
+                current_frame = shared_frame;
                 last_processed_seq = current_seq;
             }
 
             if (!visual_blur_paused) {
                 active_box_count = current_boxes.size();
-                overlay.render_boxes(current_boxes);
+                overlay.render_boxes(current_boxes, active_box_count > 0 ? &current_frame : nullptr);
                 if (active_box_count > 0) {
                     last_event = "BLUR SHIELD ACTIVE: " + std::to_string(active_box_count) + " explicit region(s) blocked";
                 }

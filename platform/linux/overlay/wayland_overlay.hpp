@@ -1,6 +1,7 @@
 #pragma once
 
 #include "engine_shared/bounding_box.hpp"
+#include "../capture/video_frame.hpp"
 #include <vector>
 #include <memory>
 #include <cstdint>
@@ -8,8 +9,10 @@
 namespace degoonification::linux_backend {
 
 struct OverlayConfig {
-    uint32_t frosted_color_argb{0xFF0F172A}; // 100% opaque dark slate privacy shield
+    uint32_t frosted_color_argb{0xFF0F172A}; // fallback opaque dark slate
     bool enable_clickthrough{true};
+    bool enable_frosted_mosaic{true}; // Frosted mosaic blur from underlying screen pixels
+    int mosaic_block_size{18};       // Size in pixels of mosaic censorship blocks
 };
 
 /**
@@ -32,9 +35,14 @@ public:
 
     /**
      * Renders explicit content blur boxes onto the overlay surface.
+     * When source_frame is provided, applies real frosted mosaic blur using
+     * the captured screen pixels.
      * When boxes is empty, clears the surface to 100% transparent.
      */
-    void render_boxes(const std::vector<core::BoundingBox>& boxes);
+    void render_boxes(
+        const std::vector<core::BoundingBox>& boxes,
+        const VideoFrame* source_frame = nullptr
+    );
 
     /**
      * Dispatches pending Wayland event queue non-blockingly.

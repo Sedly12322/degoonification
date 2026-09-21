@@ -22,32 +22,34 @@ struct TrackedShield {
     core::BoundingBox box;
     uint64_t last_seen_ms{0};
     uint64_t created_ms{0};
+    bool is_static{false};
     std::vector<AnchorPixel> anchors;
 };
 
 struct AnchorTrackerConfig {
-    /// Maximum time in ms a shield persists after lost anchor match or no new detections
-    uint64_t persistence_window_ms{1200};
-    /// Dynamic boundary expansion ratio (+35% padding by default)
-    float padding_ratio{0.35f};
+    /// Time in ms a shield persists when screen is static (anchors verified)
+    uint64_t persistence_window_ms{800};
+    /// Rapid decay time in ms for dynamic/moving video scenes (prevents ghost boxes)
+    uint64_t dynamic_decay_ms{280};
+    /// Outward boundary expansion ratio (+20% padding)
+    float padding_ratio{0.20f};
     /// Minimum IoU to associate new detections with existing shields
     float merge_iou_threshold{0.15f};
     /// Maximum mean RGB error to consider the screen around the shield static
-    float anchor_error_threshold{22.0f};
+    float anchor_error_threshold{18.0f};
+    /// Position smoothing factor (EMA): 0.70 = 70% new detection, 30% historical
+    float ema_alpha{0.70f};
 };
 
 /**
  * Visual Anchor & Anti-Flicker Shield Tracker.
  *
- * Solves the screen-capture compositor feedback loop:
- * When an opaque shield is drawn on screen, the composited screen capture contains the shield,
- * blinding the AI detector from seeing the explicit content behind it.
- *
- * This tracker samples visual anchor pixels in the perimeter collar immediately OUTSIDE
- * the shield. As long as those border pixels match (screen is static, user hasn't navigated away),
- * the shield is kept continuously active with ZERO flicker and ZERO buffer swaps.
- * When the user scrolls vertically, the tracker detects the scroll offset and glides
- * the shield along with the content.
+ * Implements:
+ * 1. Perimeter visual anchor locking for static images (0% flicker).
+ * 2. Exponential Moving Average (EMA) position tracking for moving video objects
+ *    (replaces naive united() which created smeared slug artifacts).
+ * 3. Fast dynamic decay for video scenes (eliminates ghost box artifacts).
+ * 4. Merging nearby boxes to avoid fragmented artifacts.
  */
 class VisualAnchorTracker {
 public:
@@ -66,7 +68,7 @@ public:
 
     /**
      * Ingests the current captured frame and raw detections from YOLO at current_time_ms.
-     * Evaluates anchors, incorporates new detections, prunes stale shields,
+     * Evaluates anchors, incorporates new detections with EMA smoothing, prunes stale shields,
      * and returns the final expanded, merged bounding boxes for overlay rendering.
      */
     std::vector<core::BoundingBox> process_frame(
@@ -79,17 +81,23 @@ public:
         // 1. Evaluate visual anchors for existing active shields
         if (frame.data && frame.width > 0 && frame.height > 0) {
             for (auto& shield : shields_) {
-                if (shield.anchors.empty()) continue;
+                if (shield.anchors.empty()) {
+                    shield.is_static = false;
+                    continue;
+                }
 
                 // Check static position (dy = 0)
                 float static_err = eval_anchors(frame, shield.anchors, 0);
                 if (static_err < config_.anchor_error_threshold) {
                     // Content surrounding the shield is unchanged -> lock shield active!
+                    shield.is_static = true;
                     shield.last_seen_ms = current_time_ms;
                     continue;
                 }
 
-                // Check vertical scrolling offsets: dy in {-80, -60, -40, -20, -10, 10, 20, 40, 60, 80}
+                shield.is_static = false;
+
+                // Check vertical scrolling offsets only when there is a clear, definitive scroll match
                 int best_dy = 0;
                 float best_err = static_err;
                 const int test_offsets[] = {-80, -60, -40, -20, -10, 10, 20, 40, 60, 80};
@@ -101,24 +109,32 @@ public:
                     }
                 }
 
-                if (best_err < config_.anchor_error_threshold && best_dy != 0) {
-                    // Content scrolled vertically by best_dy -> glide shield with scroll!
+                // Only adjust position if error is very low AND significantly better than static
+                // (proves webpage scroll rather than random video motion)
+                if (best_err < 8.0f && best_dy != 0 && (static_err - best_err) > 8.0f) {
                     float norm_dy = static_cast<float>(best_dy) / frame.height;
                     shield.box.y = std::clamp(shield.box.y + norm_dy, 0.0f, 1.0f - shield.box.height);
                     for (auto& a : shield.anchors) {
                         a.y += best_dy;
                     }
+                    shield.is_static = true;
                     shield.last_seen_ms = current_time_ms;
                 }
             }
         }
 
-        // 2. Ingest newly detected explicit bounding boxes from YOLO
+        // 2. Ingest newly detected explicit bounding boxes from YOLO using EMA tracking
         for (const auto& det : raw_detections) {
             bool matched = false;
             for (auto& shield : shields_) {
                 if (shield.box.overlaps(det, config_.merge_iou_threshold)) {
-                    shield.box = shield.box.united(det);
+                    // Smooth position tracking using EMA instead of growing united()
+                    float a = config_.ema_alpha;
+                    shield.box.x = a * det.x + (1.0f - a) * shield.box.x;
+                    shield.box.y = a * det.y + (1.0f - a) * shield.box.y;
+                    shield.box.width = a * det.width + (1.0f - a) * shield.box.width;
+                    shield.box.height = a * det.height + (1.0f - a) * shield.box.height;
+
                     shield.last_seen_ms = current_time_ms;
                     if (frame.data && frame.width > 0) {
                         shield.anchors = sample_anchors(frame, shield.box);
@@ -133,6 +149,7 @@ public:
                 new_shield.box = det;
                 new_shield.created_ms = current_time_ms;
                 new_shield.last_seen_ms = current_time_ms;
+                new_shield.is_static = false;
                 if (frame.data && frame.width > 0) {
                     new_shield.anchors = sample_anchors(frame, det);
                 }
@@ -140,11 +157,12 @@ public:
             }
         }
 
-        // 3. Purge shields whose anchors no longer match and have expired
+        // 3. Purge stale shields: static scenes get 800ms persistence, dynamic video gets 280ms
         shields_.erase(
             std::remove_if(shields_.begin(), shields_.end(), [&](const TrackedShield& s) {
+                uint64_t max_age = s.is_static ? config_.persistence_window_ms : config_.dynamic_decay_ms;
                 return (current_time_ms < s.last_seen_ms) ||
-                       ((current_time_ms - s.last_seen_ms) >= config_.persistence_window_ms);
+                       ((current_time_ms - s.last_seen_ms) >= max_age);
             }),
             shields_.end()
         );
@@ -187,7 +205,7 @@ private:
         int sx2 = std::clamp(static_cast<int>((exp.x + exp.width) * frame.width), 0, static_cast<int>(frame.width) - 1);
         int sy2 = std::clamp(static_cast<int>((exp.y + exp.height) * frame.height), 0, static_cast<int>(frame.height) - 1);
 
-        const int margin = 14; // pixels outside shield boundary
+        const int margin = 14;
         std::vector<AnchorPixel> pts;
         pts.reserve(24);
 

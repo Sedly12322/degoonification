@@ -227,14 +227,14 @@ static bool boxes_differ(const std::vector<core::BoundingBox>& a, const std::vec
     return false;
 }
 
-void WaylandOverlay::render_boxes(const std::vector<core::BoundingBox>& boxes) {
+void WaylandOverlay::render_boxes(const std::vector<core::BoundingBox>& boxes, const VideoFrame* source_frame) {
     if (!impl_ || !impl_->surface || !impl_->configured) return;
 
     if (boxes.empty() && impl_->last_rendered_boxes.empty()) {
         return; // Already cleared, avoid redundant composite cycles
     }
 
-    if (!boxes_differ(boxes, impl_->last_rendered_boxes)) {
+    if (!boxes_differ(boxes, impl_->last_rendered_boxes) && !source_frame) {
         return; // Boxes unchanged, retain current screen buffer to completely eliminate flicker!
     }
 
@@ -247,7 +247,7 @@ void WaylandOverlay::render_boxes(const std::vector<core::BoundingBox>& boxes) {
     if (!boxes.empty()) {
         const uint32_t w = impl_->width;
         const uint32_t h = impl_->height;
-        const uint32_t color = config_.frosted_color_argb;
+        const int block_size = std::max(8, config_.mosaic_block_size);
 
         for (const auto& box : boxes) {
             uint32_t bx1 = std::min(static_cast<uint32_t>(box.left() * w), w);
@@ -255,10 +255,49 @@ void WaylandOverlay::render_boxes(const std::vector<core::BoundingBox>& boxes) {
             uint32_t bx2 = std::min(static_cast<uint32_t>(box.right() * w), w);
             uint32_t by2 = std::min(static_cast<uint32_t>(box.bottom() * h), h);
 
-            for (uint32_t y = by1; y < by2; ++y) {
-                uint32_t* row = buf.data + (y * w);
-                for (uint32_t x = bx1; x < bx2; ++x) {
-                    row[x] = color;
+            if (config_.enable_frosted_mosaic && source_frame && source_frame->data &&
+                source_frame->width > 0 && source_frame->height > 0) {
+                const bool is_rgb24 = (source_frame->format == PixelFormat::RGB);
+                const int bpp = is_rgb24 ? 3 : 4;
+                const uint32_t src_w = source_frame->width;
+                const uint32_t src_h = source_frame->height;
+                const uint32_t src_stride = source_frame->stride > 0 ? source_frame->stride : (src_w * bpp);
+
+                for (uint32_t y = by1; y < by2; y += block_size) {
+                    uint32_t cur_bh = std::min(static_cast<uint32_t>(block_size), by2 - y);
+                    for (uint32_t x = bx1; x < bx2; x += block_size) {
+                        uint32_t cur_bw = std::min(static_cast<uint32_t>(block_size), bx2 - x);
+
+                        // Sample center of block from source frame
+                        uint32_t sample_x = std::min(x + cur_bw / 2, src_w - 1);
+                        uint32_t sample_y = std::min(y + cur_bh / 2, src_h - 1);
+                        const uint8_t* px = source_frame->data + (sample_y * src_stride) + (sample_x * bpp);
+
+                        uint32_t r = is_rgb24 ? px[0] : px[2];
+                        uint32_t g = px[1];
+                        uint32_t b = is_rgb24 ? px[2] : px[0];
+
+                        // Blend 75% natural scene color with 25% frosted dark tint
+                        uint32_t fr = (r * 3 + 15) / 4;
+                        uint32_t fg = (g * 3 + 23) / 4;
+                        uint32_t fb = (b * 3 + 42) / 4;
+                        uint32_t pixel_color = 0xFF000000 | (fr << 16) | (fg << 8) | fb;
+
+                        for (uint32_t by = 0; by < cur_bh; ++by) {
+                            uint32_t* row = buf.data + ((y + by) * w);
+                            for (uint32_t bx = 0; bx < cur_bw; ++bx) {
+                                row[x + bx] = pixel_color;
+                            }
+                        }
+                    }
+                }
+            } else {
+                const uint32_t color = config_.frosted_color_argb;
+                for (uint32_t y = by1; y < by2; ++y) {
+                    uint32_t* row = buf.data + (y * w);
+                    for (uint32_t x = bx1; x < bx2; ++x) {
+                        row[x] = color;
+                    }
                 }
             }
         }
