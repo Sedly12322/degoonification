@@ -1,0 +1,53 @@
+# C / C++ / Build artifacts
+build/
+bin/
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+*.a
+*.lib
+*.out
+compile_commands.json
+.cache/
+
+# Rust (if used)
+target/
+Cargo.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Flutter / Dart
+apps/mobile_desktop_client/.dart_tool/
+apps/mobile_desktop_client/.flutter-plugins
+apps/mobile_desktop_client/.flutter-plugins-dependencies
+apps/mobile_desktop_client/.packages
+apps/mobile_desktop_client/build/
+apps/mobile_desktop_client/.pub-cache/
+apps/mobile_desktop_client/.pub/
+
+# Android
+*.apk
+*.aab
+.gradle/
+local.properties
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Large AI model files (keep README or download script)
+core/models/*.onnx
+core/models/*.tflite
+!core/models/README.md
+!core/models/*.json
