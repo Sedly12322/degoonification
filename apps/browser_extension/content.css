@@ -1,0 +1,56 @@
+:root {
+  --degoon-blur-radius: 28px;
+  --degoon-accent-cyan: #06b6d4;
+  --degoon-accent-emerald: #10b981;
+  --degoon-dark-bg: #0f172a;
+}
+
+/* Hardware-accelerated GPU Blur for detected media */
+.degoon-blurred-media {
+  filter: blur(var(--degoon-blur-radius)) !important;
+  will-change: filter, transform !important;
+  transform: translateZ(0) !important;
+  transition: filter 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  pointer-events: auto !important;
+  user-select: none !important;
+}
+
+/* Hover reveal if allowed in options */
+.degoon-blurred-media.degoon-allow-peek:hover {
+  filter: blur(6px) !important;
+}
+
+/* Video wrapper shield */
+.degoon-video-wrapper {
+  position: relative !important;
+  display: inline-block !important;
+  overflow: hidden !important;
+}
+
+/* Shield Badge */
+.degoon-shield-badge {
+  position: absolute !important;
+  top: 8px !important;
+  left: 8px !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  color: var(--degoon-accent-cyan) !important;
+  border: 1px solid rgba(6, 182, 212, 0.4) !important;
+  border-radius: 6px !important;
+  padding: 3px 8px !important;
+  font-family: system-ui, -apple-system, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  z-index: 2147483647 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  pointer-events: none !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* Hide scrollbar flicker */
+.degoon-hidden {
+  display: none !important;
+}

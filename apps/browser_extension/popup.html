@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Degoonification Shield</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <span class="shield-icon">🛡️</span>
+        <div>
+          <h1 class="title">DEGOONIFICATION</h1>
+          <span class="subtitle">ZEN BROWSER SHIELD</span>
+        </div>
+      </div>
+      <div class="status-badge" id="statusBadge">ACTIVE</div>
+    </header>
+
+    <!-- Master Switch -->
+    <section class="card main-toggle-card">
+      <div class="toggle-info">
+        <span class="toggle-title">Real-Time Protection</span>
+        <span class="toggle-desc">Hardware-accelerated media blur</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="masterToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </section>
+
+    <!-- Blur Strength Slider -->
+    <section class="card slider-card">
+      <div class="slider-header">
+        <span class="label">Blur Strength</span>
+        <span class="value-badge" id="blurValue">28px</span>
+      </div>
+      <input type="range" id="blurSlider" min="10" max="50" value="28" class="range-slider">
+    </section>
+
+    <!-- Protection Controls -->
+    <section class="card settings-card">
+      <div class="setting-row">
+        <span>Blur All Videos</span>
+        <label class="switch-sm">
+          <input type="checkbox" id="videoToggle" checked>
+          <span class="slider-sm"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <span>Blur Trigger Images</span>
+        <label class="switch-sm">
+          <input type="checkbox" id="imageToggle" checked>
+          <span class="slider-sm"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <span>Strict Mode (All Images)</span>
+        <label class="switch-sm">
+          <input type="checkbox" id="strictToggle">
+          <span class="slider-sm"></span>
+        </label>
+      </div>
+      <div class="setting-row">
+        <span>Allow Hover Peek</span>
+        <label class="switch-sm">
+          <input type="checkbox" id="peekToggle">
+          <span class="slider-sm"></span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Stats Bar -->
+    <section class="stats-row">
+      <div class="stat-box">
+        <span class="stat-number" id="blockedCount">0</span>
+        <span class="stat-label">Media Shielded</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number">Active</span>
+        <span class="stat-label">SafeSearch</span>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>● Daemon: Synchronized (UNIX Domain Socket)</span>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

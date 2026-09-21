@@ -3,6 +3,7 @@
 all:
 	$(MAKE) -C core/engine_shared
 	$(MAKE) -C platform/linux
+	$(MAKE) -C apps/browser_extension
 
 run: all
 	@echo "=== Starting Degoonification Daemon ==="
@@ -18,6 +19,7 @@ clean:
 	$(MAKE) -C platform/linux clean
 	$(MAKE) -C platform/linux/network clean
 	$(MAKE) -C platform/linux/watchdog clean
+	$(MAKE) -C apps/browser_extension clean
 
 install: all
 	install -d $(HOME)/.local/bin
@@ -30,6 +32,7 @@ install: all
 	install -m 644 core/blocklists/default_domains.txt $(HOME)/.local/share/degoonification/blocklists/
 	install -m 644 platform/linux/watchdog/degoonification-user.service $(HOME)/.config/systemd/user/degoonification.service
 	systemctl --user daemon-reload || true
+	$(MAKE) -C apps/browser_extension install-profile
 	@echo "✓ Installed 'degoon' and 'degoonification-daemon' to $(HOME)/.local/bin"
 	@echo "✓ Installed model and blocklists to $(HOME)/.local/share/degoonification"
 	@echo "✓ Installed systemd user service to $(HOME)/.config/systemd/user/degoonification.service"

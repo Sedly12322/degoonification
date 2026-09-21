@@ -51,3 +51,4 @@ core/models/*.onnx
 core/models/*.tflite
 !core/models/README.md
 !core/models/*.json
+*.xpi

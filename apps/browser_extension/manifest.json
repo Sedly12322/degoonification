@@ -1,0 +1,45 @@
+{
+  "manifest_version": 2,
+  "name": "Degoonification // Real-Time Visual Defense",
+  "version": "1.0.0",
+  "description": "Zero-latency GPU media blurring, video shield, and SafeSearch enforcement for Zen Browser.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "degoon@degoonification.app",
+      "strict_min_version": "109.0"
+    }
+  },
+  "permissions": [
+    "<all_urls>",
+    "storage",
+    "webRequest",
+    "webRequestBlocking"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_title": "Degoonification Shield",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}
